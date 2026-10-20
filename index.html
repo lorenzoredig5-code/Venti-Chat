@@ -335,6 +335,7 @@
                     🔔
                     <span id="notif-badge" class="notification-badge hidden">0</span>
                 </button>
+                <button class="btn" id="btn-create-group" title="Criar Grupo">👥</button>
                 <button class="btn" id="btn-add" title="Adicionar Amigos">➕</button>
                 <button class="btn" id="btn-config" title="Configurações">⚙️</button>
                 <button class="btn hidden" id="btn-login-screen">Entrar</button>
@@ -507,6 +508,10 @@
 
         document.getElementById('btn-login-screen').onclick = () => authModal.classList.remove('hidden');
         document.getElementById('btn-close-auth').onclick = () => authModal.classList.add('hidden');
+
+        document.getElementById('btn-create-group').onclick = () => {
+            alert("Recurso de criação de grupos em breve!");
+        };
 
         document.getElementById('btn-forgot-password').onclick = () => {
             authModal.classList.add('hidden');
@@ -694,7 +699,6 @@
             return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
         }
 
-        // Função para remover mensagem
         async function deletarMensagem(msgId, isMine, isGroupAdmin) {
             if (!activeChatUser) return;
             const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
@@ -750,7 +754,6 @@
                             const senderNameHtml = !isMine ? `<div class="message-sender-name">${msg.senderName || 'Usuário'}</div>` : '';
                             div.innerHTML = `${senderNameHtml}<div>${msg.text}</div>`;
 
-                            // Clique para deletar mensagem (se for minha ou se eu for admin)
                             if (!msg.deleted && (isMine || isGroupAdmin)) {
                                 div.onclick = () => deletarMensagem(msgKey, isMine, isGroupAdmin);
                             }
@@ -1117,7 +1120,7 @@
                     });
                 }
                 if (exists) {
-                    alert("Erro: Este nome real já está em uso ou a senha está incorreta.");
+                    alert("Erro: Este nome real (ID único) já está sendo usado por outro usuário.");
                     return;
                 }
             }
