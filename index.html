@@ -94,6 +94,13 @@
             background-color: #c5221f;
         }
 
+        .btn-disabled {
+            background-color: #e0e0e0 !important;
+            color: #9e9e9e !important;
+            border: 1px solid #ccc !important;
+            cursor: not-allowed !important;
+        }
+
         .notification-badge {
             position: absolute;
             top: -5px;
@@ -343,7 +350,7 @@
             </div>
         </header>
 
-        <!-- TELA PRINCIPAL (HISTÓRICO DE CONVERSAS) -->
+        <!-- TELA PRINCIPAL (HISTÓRICO DE CONVERSAS E GRUPOS) -->
         <div class="content" id="main-chat-list">
             <p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Carregando...</p>
         </div>
@@ -362,16 +369,66 @@
             <script type="text/javascript" src="https://bicea.org/22/d927768606ac03740922d3c319e15bef"></script>
         </div>
 
-        <!-- TELA DE CHAT PRIVADO / GRUPO -->
+        <!-- TELA DE CHAT / GRUPO ABERTO -->
         <div id="chat-room-modal" class="modal hidden">
             <div class="modal-header">
                 <button class="btn" id="btn-close-chat">Voltar</button>
                 <h2 id="chat-target-name">Conversa</h2>
+                <button class="btn" id="btn-group-info" title="Info do Grupo">ℹ️</button>
             </div>
             <div class="messages-container" id="messages-list"></div>
             <div class="chat-input-area">
                 <input type="text" id="chat-message-input" placeholder="Digite uma mensagem...">
                 <button class="btn btn-primary" id="btn-send-message">Enviar</button>
+            </div>
+        </div>
+
+        <!-- TELA DE CRIAÇÃO DE GRUPO -->
+        <div id="create-group-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-create-group">Voltar</button>
+                <h2>Criar Novo Grupo</h2>
+            </div>
+            <label>Nome do Grupo:</label>
+            <input type="text" id="group-name-input" placeholder="Ex: Galera da firma">
+            
+            <label style="display: flex; align-items: center; margin: 10px 0; cursor: pointer;">
+                <input type="checkbox" id="group-allow-members-add" style="width: auto; margin-right: 8px;">
+                Permitir que membros adicionem outros participantes
+            </label>
+
+            <div class="section-title">Selecionar Amigos para o Grupo</div>
+            <div class="content" id="group-friends-select-list" style="padding: 0; max-height: 220px;"></div>
+
+            <button class="btn btn-primary" id="btn-submit-create-group" style="margin-top: 15px;">Criar Grupo</button>
+        </div>
+
+        <!-- TELA DE INFORMAÇÕES E ADIÇÃO DE MEMBROS NO GRUPO -->
+        <div id="group-info-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-group-info">Voltar</button>
+                <h2>Informações do Grupo</h2>
+            </div>
+            <h3 id="info-group-title" style="margin: 0 0 5px 0; text-align: center;"></h3>
+            <p id="info-group-admin" style="text-align: center; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0;"></p>
+
+            <div class="section-title">Participantes</div>
+            <div id="info-group-members-list" style="max-height: 150px; overflow-y: auto; margin-bottom: 15px;"></div>
+
+            <div id="admin-group-settings" class="hidden" style="border-top: 1px solid var(--border-color); padding-top: 10px;">
+                <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
+                    <input type="checkbox" id="info-toggle-members-add" style="width: auto; margin-right: 8px;">
+                    Todo mundo pode adicionar membros
+                </label>
+            </div>
+
+            <div id="add-member-section">
+                <div class="section-title">Adicionar Amigos ao Grupo</div>
+                <div id="info-add-friends-list" style="max-height: 150px; overflow-y: auto;"></div>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+                <button class="btn btn-danger" id="btn-leave-group">Sair do Grupo</button>
             </div>
         </div>
 
@@ -495,7 +552,7 @@
         });
 
         let currentUserData = null;
-        let activeChatUser = null;
+        let activeChatTarget = null; // Pode ser amigo ou grupo
         let activeChatListener = null;
 
         const authModal = document.getElementById('auth-modal');
@@ -505,13 +562,17 @@
         const notifModal = document.getElementById('notifications-modal');
         const configModal = document.getElementById('config-modal');
         const chatRoomModal = document.getElementById('chat-room-modal');
+        const createGroupModal = document.getElementById('create-group-modal');
+        const groupInfoModal = document.getElementById('group-info-modal');
 
         document.getElementById('btn-login-screen').onclick = () => authModal.classList.remove('hidden');
         document.getElementById('btn-close-auth').onclick = () => authModal.classList.add('hidden');
 
         document.getElementById('btn-create-group').onclick = () => {
-            alert("Módulo de criação de grupos aberto com sucesso!");
+            createGroupModal.classList.remove('hidden');
+            carregarAmigosParaCriarGrupo();
         };
+        document.getElementById('btn-close-create-group').onclick = () => createGroupModal.classList.add('hidden');
 
         document.getElementById('btn-forgot-password').onclick = () => {
             authModal.classList.add('hidden');
@@ -543,6 +604,13 @@
         };
         document.getElementById('btn-close-config').onclick = () => configModal.classList.add('hidden');
         document.getElementById('btn-close-chat').onclick = () => fecharChat();
+        document.getElementById('btn-close-group-info').onclick = () => groupInfoModal.classList.add('hidden');
+
+        document.getElementById('btn-group-info').onclick = () => {
+            if (activeChatTarget && activeChatTarget.isGroup) {
+                abrirInfoGrupo(activeChatTarget);
+            }
+        };
 
         function dispararAnimacaoConexao(nomeAmigo) {
             const pop = document.getElementById('connection-pop');
@@ -636,12 +704,12 @@
                 }
 
                 if (!foundUser) {
-                    resultDiv.innerText = "❌ Nenhuma conta foi encontrada com esse nome ou e-mail.";
+                    resultDiv.innerText = "❌ Nenhuma conta encontrada.";
                     return;
                 }
 
                 if (!foundUser.email) {
-                    resultDiv.innerText = `⚠️ Conta encontrada (${foundUser.displayName || foundUser.username}), mas ela não possui e-mail cadastrado.`;
+                    resultDiv.innerText = `⚠️ Conta encontrada, mas sem e-mail cadastrado.`;
                     return;
                 }
 
@@ -683,7 +751,7 @@
                     await set(userRef, currentUserData);
                 }
 
-                carregarConversasEAmigos();
+                carregarConversasEGrupos();
                 observarNotificacoes();
                 checarNovasConexoesAprovadas();
             } else {
@@ -699,11 +767,138 @@
             return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
         }
 
-        // Função para remover mensagem (Própria ou como Admin/Dono)
-        async function deletarMensagem(msgId, isMine, isGroupAdmin) {
-            if (!activeChatUser) return;
-            const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
-            const msgRef = ref(db, `chats/${chatId}/messages/${msgId}`);
+        // --- LÓGICA DE CRIAÇÃO DE GRUPOS ---
+        async function carregarAmigosParaCriarGrupo() {
+            const listDiv = document.getElementById('group-friends-select-list');
+            listDiv.innerHTML = "Carregando...";
+            const friendsSnap = await get(ref(db, `friends/${currentUserData.uid}`));
+            listDiv.innerHTML = "";
+
+            if (friendsSnap.exists()) {
+                const friendUids = Object.keys(friendsSnap.val());
+                for (const fUid of friendUids) {
+                    const uSnap = await get(child(ref(db), `users/${fUid}`));
+                    if (uSnap.exists()) {
+                        const u = uSnap.val();
+                        const name = u.displayName || u.username;
+                        const div = document.createElement('div');
+                        div.className = "chat-item";
+                        div.innerHTML = `
+                            <div style="display: flex; align-items: center; flex: 1;">
+                                <div class="avatar"><img src="${u.photoURL}" alt="${name}"></div>
+                                <h4>${name}</h4>
+                            </div>
+                            <input type="checkbox" class="group-member-checkbox" value="${u.uid}" style="width: auto;">
+                        `;
+                        listDiv.appendChild(div);
+                    }
+                }
+            } else {
+                listDiv.innerHTML = "<p style='padding: 10px; color: var(--text-secondary);'>Você não tem amigos para adicionar.</p>";
+            }
+        }
+
+        document.getElementById('btn-submit-create-group').onclick = async () => {
+            const groupName = document.getElementById('group-name-input').value.trim();
+            const allowMembersAdd = document.getElementById('group-allow-members-add').checked;
+            if (!groupName) { alert("Dê um nome para o grupo!"); return; }
+
+            const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
+            const members = { [currentUserData.uid]: true };
+            checkboxes.forEach(cb => members[cb.value] = true);
+
+            const groupRef = push(ref(db, 'groups'));
+            const groupId = groupRef.key;
+
+            const groupData = {
+                groupId: groupId,
+                name: groupName,
+                ownerUid: currentUserData.uid,
+                ownerName: currentUserData.displayName || currentUserData.username,
+                allowMembersAdd: allowMembersAdd,
+                members: members,
+                isGroup: true
+            };
+
+            await set(groupRef, groupData);
+
+            // Adiciona o grupo na lista de chats de cada membro
+            for (const mUid of Object.keys(members)) {
+                await set(ref(db, `userGroups/${mUid}/${groupId}`), true);
+            }
+
+            alert("Grupo criado com sucesso!");
+            document.getElementById('group-name-input').value = "";
+            createGroupModal.classList.add('hidden');
+            carregarConversasEGrupos();
+        };
+
+        // --- ABRIR CHAT (PRIVADO OU GRUPO) ---
+        function abrirChat(target) {
+            activeChatTarget = target;
+            const isGroup = target.isGroup;
+            document.getElementById('chat-target-name').innerText = target.name || target.displayName || target.username;
+            
+            const btnInfo = document.getElementById('btn-group-info');
+            if (isGroup) {
+                btnInfo.classList.remove('hidden');
+            } else {
+                btnInfo.classList.add('hidden');
+            }
+
+            chatRoomModal.classList.remove('hidden');
+            profileModal.classList.add('hidden');
+
+            const chatId = isGroup ? target.groupId : getChatId(currentUserData.uid, target.uid);
+            const messagesRef = ref(db, isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`);
+
+            activeChatListener = onValue(messagesRef, (snapshot) => {
+                const messagesList = document.getElementById('messages-list');
+                messagesList.innerHTML = "";
+
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnap) => {
+                        const msgKey = childSnap.key;
+                        const msg = childSnap.val();
+                        const isMine = msg.senderUid === currentUserData.uid;
+                        const isGroupAdmin = isGroup && (target.ownerUid === currentUserData.uid);
+
+                        const div = document.createElement('div');
+                        if (msg.type === 'system') {
+                            div.className = `system-message`;
+                            div.innerText = msg.text;
+                        } else {
+                            div.className = `message-bubble ${isMine ? 'message-mine' : 'message-other'} ${msg.deleted ? 'message-deleted' : ''}`;
+                            const senderNameHtml = !isMine ? `<div class="message-sender-name">${msg.senderName || 'Usuário'}</div>` : '';
+                            div.innerHTML = `${senderNameHtml}<div>${msg.text}</div>`;
+
+                            if (!msg.deleted && (isMine || isGroupAdmin)) {
+                                div.onclick = () => deletarMensagem(msgKey, isMine, isGroupAdmin, isGroup, chatId);
+                            }
+                        }
+                        messagesList.appendChild(div);
+                    });
+                    messagesList.scrollTop = messagesList.scrollHeight;
+                } else {
+                    messagesList.innerHTML = `<p style="text-align: center; color: var(--text-secondary); margin-top: 20px;">Nenhuma mensagem ainda.</p>`;
+                }
+            });
+        }
+
+        function fecharChat() {
+            if (activeChatListener && activeChatTarget) {
+                const chatId = activeChatTarget.isGroup ? activeChatTarget.groupId : getChatId(currentUserData.uid, activeChatTarget.uid);
+                const path = activeChatTarget.isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`;
+                off(ref(db, path));
+            }
+            activeChatTarget = null;
+            chatRoomModal.classList.add('hidden');
+            carregarConversasEGrupos();
+        }
+
+        async function deletarMensagem(msgId, isMine, isGroupAdmin, isGroup, chatId) {
+            const path = isGroup ? `groupChats/${chatId}/messages/${msgId}` : `chats/${chatId}/messages/${msgId}`;
+            const msgRef = ref(db, path);
 
             if (isMine) {
                 if (confirm("Deseja apagar sua mensagem?")) {
@@ -713,7 +908,7 @@
                         deletedByAdmin: false
                     });
                 }
-            } else if (isGroupAdmin || (currentUserData.isAdmin || currentUserData.isOwner)) {
+            } else if (isGroupAdmin) {
                 const adminName = currentUserData.displayName || currentUserData.username;
                 if (confirm(`Deseja apagar esta mensagem como Administrador?`)) {
                     await update(msgRef, {
@@ -726,66 +921,14 @@
             }
         }
 
-        function abrirChat(targetUser) {
-            activeChatUser = targetUser;
-            document.getElementById('chat-target-name').innerText = targetUser.displayName || targetUser.username;
-            chatRoomModal.classList.remove('hidden');
-            profileModal.classList.add('hidden');
-
-            const chatId = getChatId(currentUserData.uid, targetUser.uid);
-            const messagesRef = ref(db, `chats/${chatId}/messages`);
-
-            activeChatListener = onValue(messagesRef, (snapshot) => {
-                const messagesList = document.getElementById('messages-list');
-                messagesList.innerHTML = "";
-
-                if (snapshot.exists()) {
-                    snapshot.forEach((childSnap) => {
-                        const msgKey = childSnap.key;
-                        const msg = childSnap.val();
-                        const isMine = msg.senderUid === currentUserData.uid;
-                        const isGroupAdmin = currentUserData.isAdmin || currentUserData.isOwner;
-
-                        const div = document.createElement('div');
-                        if (msg.type === 'system') {
-                            div.className = `system-message`;
-                            div.innerText = msg.text;
-                        } else {
-                            div.className = `message-bubble ${isMine ? 'message-mine' : 'message-other'} ${msg.deleted ? 'message-deleted' : ''}`;
-                            const senderNameHtml = !isMine ? `<div class="message-sender-name">${msg.senderName || 'Usuário'}</div>` : '';
-                            div.innerHTML = `${senderNameHtml}<div>${msg.text}</div>`;
-
-                            // Clique para apagar mensagem (se for minha ou se eu for admin)
-                            if (!msg.deleted && (isMine || isGroupAdmin)) {
-                                div.onclick = () => deletarMensagem(msgKey, isMine, isGroupAdmin);
-                            }
-                        }
-                        messagesList.appendChild(div);
-                    });
-                    messagesList.scrollTop = messagesList.scrollHeight;
-                } else {
-                    messagesList.innerHTML = `<p style="text-align: center; color: var(--text-secondary); margin-top: 20px;">Nenhuma mensagem ainda. Digite algo abaixo!</p>`;
-                }
-            });
-        }
-
-        function fecharChat() {
-            if (activeChatListener && activeChatUser) {
-                const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
-                off(ref(db, `chats/${chatId}/messages`));
-            }
-            activeChatUser = null;
-            chatRoomModal.classList.add('hidden');
-            carregarConversasEAmigos();
-        }
-
         document.getElementById('btn-send-message').onclick = async () => {
             const input = document.getElementById('chat-message-input');
             const text = input.value.trim();
-            if (!text || !activeChatUser || !currentUserData) return;
+            if (!text || !activeChatTarget || !currentUserData) return;
 
-            const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
-            const messagesRef = ref(db, `chats/${chatId}/messages`);
+            const isGroup = activeChatTarget.isGroup;
+            const chatId = isGroup ? activeChatTarget.groupId : getChatId(currentUserData.uid, activeChatTarget.uid);
+            const messagesRef = ref(db, isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`);
             const newMsgRef = push(messagesRef);
 
             const msgData = {
@@ -797,65 +940,162 @@
             };
 
             await set(newMsgRef, msgData);
-            await set(ref(db, `chats/${chatId}/lastMessage`), msgData);
+            await set(ref(db, isGroup ? `groups/${chatId}/lastMessage` : `chats/${chatId}/lastMessage`), msgData);
             input.value = "";
         };
 
-        async function observarNotificacoes() {
-            if (!currentUserData) return;
-            const snap = await get(ref(db, `friendRequests/${currentUserData.uid}`));
-            const badge = document.getElementById('notif-badge');
+        // --- INFORMAÇÕES DO GRUPO E SAÍDA ---
+        async function abrirInfoGrupo(group) {
+            document.getElementById('info-group-title').innerText = group.name;
+            document.getElementById('info-group-admin').innerText = `Criado por: ${group.ownerName}`;
 
-            if (snap.exists()) {
-                let count = 0;
-                snap.forEach((childSnap) => {
-                    if (childSnap.val().status === "pendente") count++;
-                });
+            const isOwner = group.ownerUid === currentUserData.uid;
+            const adminSettings = document.getElementById('admin-group-settings');
+            const toggleAdd = document.getElementById('info-toggle-members-add');
 
-                if (count > 0) {
-                    badge.classList.remove('hidden');
-                    badge.innerText = count > 5 ? "várias" : count;
-                } else {
-                    badge.classList.add('hidden');
+            if (isOwner) {
+                adminSettings.classList.remove('hidden');
+                toggleAdd.checked = group.allowMembersAdd;
+                toggleAdd.onchange = async () => {
+                    await update(ref(db, `groups/${group.groupId}`), { allowMembersAdd: toggleAdd.checked });
+                    group.allowMembersAdd = toggleAdd.checked;
+                };
+            } else {
+                adminSettings.classList.add('hidden');
+            }
+
+            // Membros atuais
+            const membersListDiv = document.getElementById('info-group-members-list');
+            membersListDiv.innerHTML = "";
+            const currentMembersUids = Object.keys(group.members || {});
+            
+            for (const mUid of currentMembersUids) {
+                const uSnap = await get(child(ref(db), `users/${mUid}`));
+                if (uSnap.exists()) {
+                    const u = uSnap.val();
+                    const div = document.createElement('div');
+                    div.style.padding = "4px 0";
+                    div.innerText = `${u.displayName || u.username} ${mUid === group.ownerUid ? '(Dono)' : ''}`;
+                    membersListDiv.appendChild(div);
+                }
+            }
+
+            // Adicionar amigos se permitido
+            const addSection = document.getElementById('add-member-section');
+            const addFriendsList = document.getElementById('info-add-friends-list');
+            addFriendsList.innerHTML = "";
+
+            if (isOwner || group.allowMembersAdd) {
+                addSection.classList.remove('hidden');
+                const friendsSnap = await get(ref(db, `friends/${currentUserData.uid}`));
+                if (friendsSnap.exists()) {
+                    for (const fUid of Object.keys(friendsSnap.val())) {
+                        const uSnap = await get(child(ref(db), `users/${fUid}`));
+                        if (uSnap.exists()) {
+                            const u = uSnap.val();
+                            const isAlreadyMember = currentMembersUids.includes(fUid);
+                            const div = document.createElement('div');
+                            div.className = "chat-item";
+                            div.innerHTML = `
+                                <h4>${u.displayName || u.username}</h4>
+                                ${isAlreadyMember ? '<span style="color: gray; font-size: 0.8rem;">Esta pessoa já está no grupo</span>' : `<button class="btn btn-primary" id="add-to-group-${fUid}">Adicionar</button>`}
+                            `;
+                            addFriendsList.appendChild(div);
+
+                            if (!isAlreadyMember) {
+                                div.querySelector(`#add-to-group-${fUid}`).onclick = async () => {
+                                    await update(ref(db, `groups/${group.groupId}/members`), { [fUid]: true });
+                                    await set(ref(db, `userGroups/${fUid}/${group.groupId}`), true);
+                                    alert("Membro adicionado!");
+                                    abrirInfoGrupo(group);
+                                };
+                            }
+                        }
+                    }
                 }
             } else {
-                badge.classList.add('hidden');
+                addSection.classList.add('hidden');
             }
+
+            // Botão Sair do Grupo
+            document.getElementById('btn-leave-group').onclick = async () => {
+                if (confirm("Deseja realmente sair deste grupo?")) {
+                    await remove(ref(db, `groups/${group.groupId}/members/${currentUserData.uid}`));
+                    await remove(ref(db, `userGroups/${currentUserData.uid}/${group.groupId}`));
+
+                    // Envia aviso no chat que a pessoa saiu
+                    const messagesRef = ref(db, `groupChats/${group.groupId}/messages`);
+                    await set(push(messagesRef), {
+                        type: 'system',
+                        text: `${currentUserData.displayName || currentUserData.username} saiu do grupo`,
+                        timestamp: Date.now()
+                    });
+
+                    groupInfoModal.classList.add('hidden');
+                    fecharChat();
+                    carregarConversasEGrupos();
+                }
+            };
+
+            groupInfoModal.classList.remove('hidden');
         }
 
-        async function carregarConversasEAmigos() {
+        // --- CARREGAR CONVERSAS E GRUPOS NA TELA PRINCIPAL ---
+        async function carregarConversasEGrupos() {
             if (!currentUserData) return;
             const mainList = document.getElementById('main-chat-list');
             mainList.innerHTML = "Carregando...";
 
-            const friendsSnap = await get(ref(db, `friends/${currentUserData.uid}`));
             mainList.innerHTML = "";
 
-            if (friendsSnap.exists()) {
-                const friendUids = Object.keys(friendsSnap.val());
-                
-                for (const friendUid of friendUids) {
-                    const userSnap = await get(child(ref(db), `users/${friendUid}`));
-                    if (userSnap.exists()) {
-                        const friend = userSnap.val();
-                        const chatId = getChatId(currentUserData.uid, friend.uid);
-                        
-                        const lastMsgSnap = await get(ref(db, `chats/${chatId}/lastMessage`));
-                        let lastText = "Começar conversa com seu amigo";
-                        
-                        if (lastMsgSnap.exists()) {
-                            lastText = lastMsgSnap.val().text;
-                        }
-
-                        const friendName = friend.displayName || friend.username;
-                        const avatarUrl = (friend.photoURL && friend.photoURL.startsWith("http")) ? friend.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${friend.username}`;
-                        const avatarContent = `<img src="${avatarUrl}" alt="${friendName}">`;
+            // Carrega Grupos
+            const userGroupsSnap = await get(ref(db, `userGroups/${currentUserData.uid}`));
+            if (userGroupsSnap.exists()) {
+                for (const gId of Object.keys(userGroupsSnap.val())) {
+                    const gSnap = await get(ref(db, `groups/${gId}`));
+                    if (gSnap.exists()) {
+                        const group = gSnap.val();
+                        const lastMsgSnap = await get(ref(db, `groups/${gId}/lastMessage`));
+                        let lastText = "Grupo criado";
+                        if (lastMsgSnap.exists()) lastText = lastMsgSnap.val().text;
 
                         const div = document.createElement('div');
                         div.className = "chat-item";
                         div.innerHTML = `
                             <div style="display: flex; align-items: center; flex: 1;">
-                                <div class="avatar">${avatarContent}</div>
+                                <div class="avatar" style="background-color: var(--primary-blue);">👥</div>
+                                <div class="chat-info">
+                                    <h4>${group.name} (Grupo)</h4>
+                                    <p>${lastText}</p>
+                                </div>
+                            </div>
+                        `;
+                        div.onclick = () => abrirChat(group);
+                        mainList.appendChild(div);
+                    }
+                }
+            }
+
+            // Carrega Amigos Privados
+            const friendsSnap = await get(ref(db, `friends/${currentUserData.uid}`));
+            if (friendsSnap.exists()) {
+                for (const friendUid of Object.keys(friendsSnap.val())) {
+                    const userSnap = await get(child(ref(db), `users/${friendUid}`));
+                    if (userSnap.exists()) {
+                        const friend = userSnap.val();
+                        const chatId = getChatId(currentUserData.uid, friend.uid);
+                        const lastMsgSnap = await get(ref(db, `chats/${chatId}/lastMessage`));
+                        let lastText = "Começar conversa com seu amigo";
+                        if (lastMsgSnap.exists()) lastText = lastMsgSnap.val().text;
+
+                        const friendName = friend.displayName || friend.username;
+                        const avatarUrl = friend.photoURL;
+
+                        const div = document.createElement('div');
+                        div.className = "chat-item";
+                        div.innerHTML = `
+                            <div style="display: flex; align-items: center; flex: 1;">
+                                <div class="avatar"><img src="${avatarUrl}" alt="${friendName}"></div>
                                 <div class="chat-info">
                                     <h4>${friendName}</h4>
                                     <p>${lastText}</p>
@@ -866,11 +1106,14 @@
                         mainList.appendChild(div);
                     }
                 }
-            } else {
-                mainList.innerHTML = `<p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Nenhum amigo adicionado ainda. Clique em ➕ para encontrar pessoas.</p>`;
+            }
+
+            if (!userGroupsSnap.exists() && !friendsSnap.exists()) {
+                mainList.innerHTML = `<p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Nenhuma conversa ou grupo ainda. Crie um grupo ou adicione amigos!</p>`;
             }
         }
 
+        // --- BUSCA E PERFIS ---
         const searchInput = document.getElementById('search-user-input');
         const searchResultsList = document.getElementById('search-results-list');
         const suggestionsList = document.getElementById('suggestions-list');
@@ -885,18 +1128,14 @@
                 usersSnap.forEach((childSnap) => {
                     const u = childSnap.val();
                     if (u.uid === currentUserData.uid) return;
-                    
                     const displayName = u.displayName || u.username;
-                    if (filtro && !displayName.toLowerCase().includes(filtro.toLowerCase()) && !u.username.toLowerCase().includes(filtro.toLowerCase())) return;
-
-                    const avatarUrl = (u.photoURL && u.photoURL.startsWith("http")) ? u.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${u.username}`;
-                    const avatarContent = `<img src="${avatarUrl}" alt="${displayName}">`;
+                    if (filtro && !displayName.toLowerCase().includes(filtro.toLowerCase())) return;
 
                     const div = document.createElement('div');
                     div.className = "chat-item";
                     div.innerHTML = `
                         <div style="display: flex; align-items: center; flex: 1;">
-                            <div class="avatar">${avatarContent}</div>
+                            <div class="avatar"><img src="${u.photoURL}" alt="${displayName}"></div>
                             <div class="chat-info"><h4>${displayName}</h4></div>
                         </div>
                         <button class="btn">Ver Perfil</button>
@@ -904,41 +1143,28 @@
                     div.onclick = () => abrirPerfil(u);
                     searchResultsList.appendChild(div);
                 });
-            } else {
-                searchResultsList.innerHTML = "<p style='padding: 10px;'>Nenhum usuário encontrado.</p>";
             }
         }
-
         searchInput.oninput = (e) => carregarUsuarios(e.target.value);
 
         async function carregarSugestoes() {
             if (!currentUserData) return;
-            suggestionsList.innerHTML = "Carregando...";
+            suggestionsList.innerHTML = "";
             const usersSnap = await get(ref(db, 'users'));
             const friendsSnap = await get(ref(db, `friends/${currentUserData.uid}`));
-            
             const friendsList = friendsSnap.exists() ? Object.keys(friendsSnap.val()) : [];
-            suggestionsList.innerHTML = "";
 
-            let count = 0;
             if (usersSnap.exists()) {
                 usersSnap.forEach((childSnap) => {
                     const u = childSnap.val();
-                    if (u.uid === currentUserData.uid) return;
-                    if (friendsList.includes(u.uid)) return;
-                    if (count >= 10) return;
-
-                    count++;
-                    const displayName = u.displayName || u.username;
-                    const avatarUrl = (u.photoURL && u.photoURL.startsWith("http")) ? u.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${u.username}`;
-                    const avatarContent = `<img src="${avatarUrl}" alt="${displayName}">`;
+                    if (u.uid === currentUserData.uid || friendsList.includes(u.uid)) return;
 
                     const div = document.createElement('div');
                     div.className = "chat-item";
                     div.innerHTML = `
                         <div style="display: flex; align-items: center; flex: 1;">
-                            <div class="avatar">${avatarContent}</div>
-                            <div class="chat-info"><h4>${displayName}</h4></div>
+                            <div class="avatar"><img src="${u.photoURL}" alt="${u.displayName}"></div>
+                            <div class="chat-info"><h4>${u.displayName || u.username}</h4></div>
                         </div>
                         <button class="btn">Ver Perfil</button>
                     `;
@@ -946,27 +1172,16 @@
                     suggestionsList.appendChild(div);
                 });
             }
-            if (count === 0) {
-                suggestionsList.innerHTML = "<p style='padding: 10px; color: var(--text-secondary);'>Nenhuma sugestão no momento.</p>";
-            }
         }
 
         async function abrirPerfil(targetUser) {
             const freshSnap = await get(child(ref(db), `users/${targetUser.uid}`));
             const userData = freshSnap.exists() ? freshSnap.val() : targetUser;
-
-            const displayName = userData.displayName || userData.username;
-            const realName = `@${userData.username}`;
-            const bioText = userData.bio || "Sem biografia.";
-
-            document.getElementById('profile-title-name').innerText = displayName;
-            document.getElementById('profile-display-name').innerText = displayName;
-            document.getElementById('profile-real-name').innerText = realName;
-            document.getElementById('profile-bio').innerText = bioText;
-            
-            const avatarDiv = document.getElementById('profile-avatar');
-            const avatarUrl = (userData.photoURL && userData.photoURL.startsWith("http")) ? userData.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${userData.username}`;
-            avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="${displayName}">`;
+            document.getElementById('profile-title-name').innerText = userData.displayName;
+            document.getElementById('profile-display-name').innerText = userData.displayName;
+            document.getElementById('profile-real-name').innerText = `@${userData.username}`;
+            document.getElementById('profile-bio').innerText = userData.bio || "Sem biografia.";
+            document.getElementById('profile-avatar').innerHTML = `<img src="${userData.photoURL}" alt="${userData.displayName}">`;
 
             const statusText = document.getElementById('profile-friend-status');
             const actionsDiv = document.getElementById('profile-actions');
@@ -975,67 +1190,32 @@
             profileModal.classList.remove('hidden');
 
             const friendsSnap = await get(child(ref(db), `friends/${currentUserData.uid}/${targetUser.uid}`));
-            const isFriend = friendsSnap.exists();
-
-            const reqSnap = await get(child(ref(db), `friendRequests/${targetUser.uid}/${currentUserData.uid}`));
-            const sentSnap = reqSnap.exists();
-
-            if (isFriend) {
-                statusText.innerText = "Você tem amizade com essa pessoa";
-                
+            if (friendsSnap.exists()) {
+                statusText.innerText = "Amigos";
                 const btnRemove = document.createElement('button');
                 btnRemove.className = "btn btn-danger";
                 btnRemove.innerText = "Remover Amizade";
-                btnRemove.addEventListener('click', async () => {
-                    if (confirm(`Deseja realmente remover ${displayName} dos seus amigos?`)) {
-                        await remove(ref(db, `friends/${currentUserData.uid}/${targetUser.uid}`));
-                        await remove(ref(db, `friends/${targetUser.uid}/${currentUserData.uid}`));
-                        alert("Amizade removida com sucesso.");
-                        abrirPerfil(userData);
-                        carregarConversasEAmigos();
-                    }
-                });
+                btnRemove.onclick = async () => {
+                    await remove(ref(db, `friends/${currentUserData.uid}/${targetUser.uid}`));
+                    await remove(ref(db, `friends/${targetUser.uid}/${currentUserData.uid}`));
+                    abrirPerfil(userData);
+                    carregarConversasEGrupos();
+                };
                 actionsDiv.appendChild(btnRemove);
-
-                const btnMsg = document.createElement('button');
-                btnMsg.className = "btn";
-                btnMsg.innerText = "Mandar Mensagem";
-                btnMsg.addEventListener('click', () => abrirChat(userData));
-                actionsDiv.appendChild(btnMsg);
             } else {
-                if (sentSnap) {
-                    const btnCancel = document.createElement('button');
-                    btnCancel.className = "btn";
-                    btnCancel.innerText = "Cancelar Pedido de Amizade";
-                    btnCancel.addEventListener('click', async () => {
-                        await remove(ref(db, `friendRequests/${targetUser.uid}/${currentUserData.uid}`));
-                        alert("Pedido cancelado.");
-                        abrirPerfil(userData);
+                const btnAdd = document.createElement('button');
+                btnAdd.className = "btn btn-primary";
+                btnAdd.innerText = "Adicionar como Amigo";
+                btnAdd.onclick = async () => {
+                    await set(ref(db, `friendRequests/${targetUser.uid}/${currentUserData.uid}`), {
+                        fromUid: currentUserData.uid,
+                        fromUsername: currentUserData.displayName || currentUserData.username,
+                        status: "pendente"
                     });
-                    actionsDiv.appendChild(btnCancel);
-                } else {
-                    const btnAdd = document.createElement('button');
-                    btnAdd.className = "btn btn-primary";
-                    btnAdd.innerText = "Adicionar como Amigo";
-                    btnAdd.addEventListener('click', async () => {
-                        await set(ref(db, `friendRequests/${targetUser.uid}/${currentUserData.uid}`), {
-                            fromUid: currentUserData.uid,
-                            fromUsername: currentUserData.displayName || currentUserData.username,
-                            status: "pendente"
-                        });
-                        alert(`Pedido enviado para ${displayName}!`);
-                        abrirPerfil(userData);
-                    });
-                    actionsDiv.appendChild(btnAdd);
-                }
-
-                if (userData.allowDirectMessage) {
-                    const btnMsg = document.createElement('button');
-                    btnMsg.className = "btn";
-                    btnMsg.innerText = "Mandar Mensagem";
-                    btnMsg.addEventListener('click', () => abrirChat(userData));
-                    actionsDiv.appendChild(btnMsg);
-                }
+                    alert("Pedido enviado!");
+                    abrirPerfil(userData);
+                };
+                actionsDiv.appendChild(btnAdd);
             }
         }
 
@@ -1047,11 +1227,9 @@
             notifList.innerHTML = "";
 
             if (snap.exists()) {
-                let temPendentes = false;
                 snap.forEach((childSnap) => {
                     const req = childSnap.val();
                     if (req.status === "pendente") {
-                        temPendentes = true;
                         const div = document.createElement('div');
                         div.className = "chat-item";
                         div.innerHTML = `
@@ -1063,7 +1241,7 @@
                         `;
                         notifList.appendChild(div);
 
-                        div.querySelector(`#accept-${req.fromUid}`).addEventListener('click', async () => {
+                        div.querySelector(`#accept-${req.fromUid}`).onclick = async () => {
                             await set(ref(db, `friends/${currentUserData.uid}/${req.fromUid}`), true);
                             await set(ref(db, `friends/${req.fromUid}/${currentUserData.uid}`), true);
                             await remove(ref(db, `friendRequests/${currentUserData.uid}/${req.fromUid}`));
@@ -1075,22 +1253,16 @@
                             });
 
                             dispararAnimacaoConexao(req.fromUsername);
-
                             carregarNotificacoes();
-                            carregarConversasEAmigos();
-                            observarNotificacoes();
-                        });
+                            carregarConversasEGrupos();
+                        };
 
-                        div.querySelector(`#reject-${req.fromUid}`).addEventListener('click', async () => {
+                        div.querySelector(`#reject-${req.fromUid}`).onclick = async () => {
                             await remove(ref(db, `friendRequests/${currentUserData.uid}/${req.fromUid}`));
                             carregarNotificacoes();
-                            observarNotificacoes();
-                        });
+                        };
                     }
                 });
-                if (!temPendentes) {
-                    notifList.innerHTML = "<p style='padding: 10px; color: var(--text-secondary);'>Nenhuma notificação.</p>";
-                }
             } else {
                 notifList.innerHTML = "<p style='padding: 10px; color: var(--text-secondary);'>Nenhuma notificação.</p>";
             }
@@ -1106,52 +1278,16 @@
             const newBio = document.getElementById('config-bio').value.trim();
             const allowDM = document.getElementById('allow-direct-message').checked;
 
-            if (!newRealName) {
-                alert("O nome real não pode ficar vazio!");
-                return;
-            }
-
-            if (newRealName !== currentUserData.username) {
-                const usersSnap = await get(ref(db, 'users'));
-                let exists = false;
-                if (usersSnap.exists()) {
-                    usersSnap.forEach(childSnap => {
-                        if (childSnap.key !== uid && childSnap.val().username === newRealName) {
-                            exists = true;
-                        }
-                    });
-                }
-                if (exists) {
-                    alert("Erro: Este nome real (ID único) já está sendo usado por outro usuário.");
-                    return;
-                }
-            }
-
-            if (newEmail && newEmail !== currentUserData.email) {
-                try {
-                    await updateEmail(auth.currentUser, newEmail);
-                } catch (emailErr) {
-                    console.log("Aviso ao atualizar e-mail no Auth:", emailErr.message);
-                }
-            }
+            if (!newRealName) { alert("Nome real obrigatório!"); return; }
 
             const photoURL = `https://api.dicebear.com/10.x/lorelei/svg?seed=${newRealName}`;
-
-            const updatedData = {
-                username: newRealName,
-                displayName: newDisplayName || newRealName,
-                email: newEmail,
-                bio: newBio,
-                allowDirectMessage: allowDM,
-                photoURL: photoURL
-            };
+            const updatedData = { username: newRealName, displayName: newDisplayName || newRealName, email: newEmail, bio: newBio, allowDirectMessage: allowDM, photoURL };
 
             await update(ref(db, `users/${uid}`), updatedData);
             currentUserData = { ...currentUserData, ...updatedData };
-
-            alert("Configurações salvas com sucesso!");
+            alert("Configurações salvas!");
             configModal.classList.add('hidden');
-            carregarConversasEAmigos();
+            carregarConversasEGrupos();
         };
     </script>
 </body>
