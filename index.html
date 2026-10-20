@@ -193,6 +193,7 @@
             font-size: 0.9rem;
             line-height: 1.3;
             word-wrap: break-word;
+            cursor: pointer;
         }
 
         .message-mine {
@@ -207,6 +208,30 @@
             background-color: var(--msg-other-bg);
             color: var(--text-primary);
             border: 1px solid var(--border-color);
+        }
+
+        .message-deleted {
+            font-style: italic;
+            color: var(--text-secondary) !important;
+            opacity: 0.8;
+        }
+
+        .message-sender-name {
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: var(--primary-blue);
+            margin-bottom: 3px;
+        }
+
+        .system-message {
+            align-self: center;
+            background-color: #f1f3f4;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            margin: 4px 0;
+            text-align: center;
         }
 
         .chat-input-area {
@@ -269,7 +294,6 @@
             flex-shrink: 0;
         }
 
-        /* ANIMAÇÃO POP-UP DE NOVA CONEXÃO / AMIZADE ACEITA */
         .connection-popup {
             position: absolute;
             top: 20px;
@@ -515,7 +539,6 @@
         document.getElementById('btn-close-config').onclick = () => configModal.classList.add('hidden');
         document.getElementById('btn-close-chat').onclick = () => fecharChat();
 
-        // Animação visual pop-up ao aceitar amizade (exibida apenas 1 vez ao entrar)
         function dispararAnimacaoConexao(nomeAmigo) {
             const pop = document.getElementById('connection-pop');
             const text = document.getElementById('connection-pop-text');
@@ -536,7 +559,6 @@
                     const alertData = childSnap.val();
                     if (!alertData.alertVisto) {
                         dispararAnimacaoConexao(alertData.friendName);
-                        // Marca como visto no Firebase para NUNCA mais exibir novamente
                         update(ref(db, `connectionAlerts/${currentUserData.uid}/${childSnap.key}`), { alertVisto: true });
                     }
                 });
@@ -614,12 +636,12 @@
                 }
 
                 if (!foundUser.email) {
-                    resultDiv.innerText = `⚠️ Conta encontrada (${foundUser.displayName || foundUser.username}), mas ela não possui um e-mail cadastrado para redefinir a senha.`;
+                    resultDiv.innerText = `⚠️ Conta encontrada (${foundUser.displayName || foundUser.username}), mas ela não possui e-mail cadastrado.`;
                     return;
                 }
 
                 await sendPasswordResetEmail(auth, foundUser.email);
-                resultDiv.innerText = `✅ Conta encontrada: "${foundUser.displayName || foundUser.username}"!\nEnviamos um e-mail de redefinição de senha para ${foundUser.email}. Verifique sua caixa de entrada/spam.`;
+                resultDiv.innerText = `✅ E-mail de redefinição enviado para ${foundUser.email}.`;
             } catch (error) {
                 resultDiv.innerText = "Erro ao enviar e-mail: " + error.message;
             }
@@ -672,6 +694,33 @@
             return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
         }
 
+        // Função para remover mensagem
+        async function deletarMensagem(msgId, isMine, isGroupAdmin) {
+            if (!activeChatUser) return;
+            const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
+            const msgRef = ref(db, `chats/${chatId}/messages/${msgId}`);
+
+            if (isMine) {
+                if (confirm("Deseja apagar sua mensagem?")) {
+                    await update(msgRef, {
+                        text: "Mensagem apagada",
+                        deleted: true,
+                        deletedByAdmin: false
+                    });
+                }
+            } else if (isGroupAdmin || (activeChatUser.isAdmin || activeChatUser.isOwner)) {
+                const adminName = currentUserData.displayName || currentUserData.username;
+                if (confirm(`Deseja apagar esta mensagem como Admin?`)) {
+                    await update(msgRef, {
+                        text: `Mensagem apagada por: ${adminName}`,
+                        deleted: true,
+                        deletedByAdmin: true,
+                        deletedByAdminName: adminName
+                    });
+                }
+            }
+        }
+
         function abrirChat(targetUser) {
             activeChatUser = targetUser;
             document.getElementById('chat-target-name').innerText = targetUser.displayName || targetUser.username;
@@ -687,12 +736,25 @@
 
                 if (snapshot.exists()) {
                     snapshot.forEach((childSnap) => {
+                        const msgKey = childSnap.key;
                         const msg = childSnap.val();
                         const isMine = msg.senderUid === currentUserData.uid;
-                        
+                        const isGroupAdmin = targetUser.isAdmin || targetUser.isOwner;
+
                         const div = document.createElement('div');
-                        div.className = `message-bubble ${isMine ? 'message-mine' : 'message-other'}`;
-                        div.innerText = msg.text;
+                        if (msg.type === 'system') {
+                            div.className = `system-message`;
+                            div.innerText = msg.text;
+                        } else {
+                            div.className = `message-bubble ${isMine ? 'message-mine' : 'message-other'} ${msg.deleted ? 'message-deleted' : ''}`;
+                            const senderNameHtml = !isMine ? `<div class="message-sender-name">${msg.senderName || 'Usuário'}</div>` : '';
+                            div.innerHTML = `${senderNameHtml}<div>${msg.text}</div>`;
+
+                            // Clique para deletar mensagem (se for minha ou se eu for admin)
+                            if (!msg.deleted && (isMine || isGroupAdmin)) {
+                                div.onclick = () => deletarMensagem(msgKey, isMine, isGroupAdmin);
+                            }
+                        }
                         messagesList.appendChild(div);
                     });
                     messagesList.scrollTop = messagesList.scrollHeight;
@@ -723,8 +785,10 @@
 
             const msgData = {
                 senderUid: currentUserData.uid,
+                senderName: currentUserData.displayName || currentUserData.username,
                 text: text,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                deleted: false
             };
 
             await set(newMsgRef, msgData);
@@ -995,19 +1059,16 @@
                         notifList.appendChild(div);
 
                         div.querySelector(`#accept-${req.fromUid}`).addEventListener('click', async () => {
-                            // Salva a conexão nos dois perfis
                             await set(ref(db, `friends/${currentUserData.uid}/${req.fromUid}`), true);
                             await set(ref(db, `friends/${req.fromUid}/${currentUserData.uid}`), true);
                             await remove(ref(db, `friendRequests/${currentUserData.uid}/${req.fromUid}`));
                             
-                            // Cria a notificação de alerta único com animação para a outra pessoa ver quando entrar
                             const alertRef = push(ref(db, `connectionAlerts/${req.fromUid}`));
                             await set(alertRef, {
                                 friendName: currentUserData.displayName || currentUserData.username,
                                 alertVisto: false
                             });
 
-                            // Dispara a animação na hora para quem clicou em Aceitar
                             dispararAnimacaoConexao(req.fromUsername);
 
                             carregarNotificacoes();
@@ -1056,7 +1117,7 @@
                     });
                 }
                 if (exists) {
-                    alert("Erro: Este nome real (ID único) já está sendo usado por outro usuário.");
+                    alert("Erro: Este nome real já está em uso ou a senha está incorreta.");
                     return;
                 }
             }
