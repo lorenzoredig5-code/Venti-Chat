@@ -255,7 +255,7 @@
             margin-top: 6px;
         }
 
-        /* Estilo da Barra Fixa de Anúncio */
+        /* Barra Fixa de Anúncio */
         .ad-banner-container {
             width: 100%;
             background-color: #f1f3f4;
@@ -268,11 +268,41 @@
             align-items: center;
             flex-shrink: 0;
         }
+
+        /* ANIMAÇÃO POP-UP DE NOVA CONEXÃO / AMIZADE ACEITA */
+        .connection-popup {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: #1a73e8;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 100;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .connection-popup.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <!-- ANIMAÇÃO POP-UP DE CONEXÃO -->
+        <div id="connection-pop" class="connection-popup">
+            <span style="font-size: 1.3rem;">🎉</span>
+            <span id="connection-pop-text" style="font-weight: bold; font-size: 0.9rem;">Você e Nome se conectaram!</span>
+        </div>
+
         <!-- HEADER PRINCIPAL -->
         <header>
             <h1 id="app-title">Vinte Chat</h1>
@@ -485,6 +515,34 @@
         document.getElementById('btn-close-config').onclick = () => configModal.classList.add('hidden');
         document.getElementById('btn-close-chat').onclick = () => fecharChat();
 
+        // Animação visual pop-up ao aceitar amizade (exibida apenas 1 vez ao entrar)
+        function dispararAnimacaoConexao(nomeAmigo) {
+            const pop = document.getElementById('connection-pop');
+            const text = document.getElementById('connection-pop-text');
+            text.innerText = `Você e ${nomeAmigo} se conectaram!`;
+            pop.classList.add('show');
+
+            setTimeout(() => {
+                pop.classList.remove('show');
+            }, 4000);
+        }
+
+        async function checarNovasConexoesAprovadas() {
+            if (!currentUserData) return;
+            const snap = await get(ref(db, `connectionAlerts/${currentUserData.uid}`));
+
+            if (snap.exists()) {
+                snap.forEach((childSnap) => {
+                    const alertData = childSnap.val();
+                    if (!alertData.alertVisto) {
+                        dispararAnimacaoConexao(alertData.friendName);
+                        // Marca como visto no Firebase para NUNCA mais exibir novamente
+                        update(ref(db, `connectionAlerts/${currentUserData.uid}/${childSnap.key}`), { alertVisto: true });
+                    }
+                });
+            }
+        }
+
         document.getElementById('btn-submit-auth').onclick = async () => {
             const username = document.getElementById('auth-username').value.trim().toLowerCase();
             const password = document.getElementById('auth-password').value;
@@ -600,6 +658,7 @@
 
                 carregarConversasEAmigos();
                 observarNotificacoes();
+                checarNovasConexoesAprovadas();
             } else {
                 btnLoginScreen.classList.remove('hidden');
                 btnLogout.classList.add('hidden');
@@ -927,7 +986,7 @@
                         const div = document.createElement('div');
                         div.className = "chat-item";
                         div.innerHTML = `
-                            <div class="chat-info"><h4>${req.fromUsername}</h4><p>Te enviou um pedido</p></div>
+                            <div class="chat-info"><h4>${req.fromUsername}</h4><p>Te enviou um pedido de amizade</p></div>
                             <div>
                                 <button class="btn btn-primary" id="accept-${req.fromUid}">Aceitar</button>
                                 <button class="btn" id="reject-${req.fromUid}">Recusar</button>
@@ -936,10 +995,21 @@
                         notifList.appendChild(div);
 
                         div.querySelector(`#accept-${req.fromUid}`).addEventListener('click', async () => {
+                            // Salva a conexão nos dois perfis
                             await set(ref(db, `friends/${currentUserData.uid}/${req.fromUid}`), true);
                             await set(ref(db, `friends/${req.fromUid}/${currentUserData.uid}`), true);
                             await remove(ref(db, `friendRequests/${currentUserData.uid}/${req.fromUid}`));
-                            alert(`${req.fromUsername} adicionado como amigo!`);
+                            
+                            // Cria a notificação de alerta único com animação para a outra pessoa ver quando entrar
+                            const alertRef = push(ref(db, `connectionAlerts/${req.fromUid}`));
+                            await set(alertRef, {
+                                friendName: currentUserData.displayName || currentUserData.username,
+                                alertVisto: false
+                            });
+
+                            // Dispara a animação na hora para quem clicou em Aceitar
+                            dispararAnimacaoConexao(req.fromUsername);
+
                             carregarNotificacoes();
                             carregarConversasEAmigos();
                             observarNotificacoes();
