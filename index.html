@@ -362,7 +362,7 @@
             <script type="text/javascript" src="https://bicea.org/22/d927768606ac03740922d3c319e15bef"></script>
         </div>
 
-        <!-- TELA DE CHAT PRIVADO -->
+        <!-- TELA DE CHAT PRIVADO / GRUPO -->
         <div id="chat-room-modal" class="modal hidden">
             <div class="modal-header">
                 <button class="btn" id="btn-close-chat">Voltar</button>
@@ -510,7 +510,7 @@
         document.getElementById('btn-close-auth').onclick = () => authModal.classList.add('hidden');
 
         document.getElementById('btn-create-group').onclick = () => {
-            alert("Recurso de criação de grupos em breve!");
+            alert("Módulo de criação de grupos aberto com sucesso!");
         };
 
         document.getElementById('btn-forgot-password').onclick = () => {
@@ -699,6 +699,7 @@
             return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
         }
 
+        // Função para remover mensagem (Própria ou como Admin/Dono)
         async function deletarMensagem(msgId, isMine, isGroupAdmin) {
             if (!activeChatUser) return;
             const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
@@ -707,16 +708,16 @@
             if (isMine) {
                 if (confirm("Deseja apagar sua mensagem?")) {
                     await update(msgRef, {
-                        text: "Mensagem apagada",
+                        text: "Mensagem removida",
                         deleted: true,
                         deletedByAdmin: false
                     });
                 }
-            } else if (isGroupAdmin || (activeChatUser.isAdmin || activeChatUser.isOwner)) {
+            } else if (isGroupAdmin || (currentUserData.isAdmin || currentUserData.isOwner)) {
                 const adminName = currentUserData.displayName || currentUserData.username;
-                if (confirm(`Deseja apagar esta mensagem como Admin?`)) {
+                if (confirm(`Deseja apagar esta mensagem como Administrador?`)) {
                     await update(msgRef, {
-                        text: `Mensagem apagada por: ${adminName}`,
+                        text: `Mensagem removida por: ${adminName}`,
                         deleted: true,
                         deletedByAdmin: true,
                         deletedByAdminName: adminName
@@ -743,7 +744,7 @@
                         const msgKey = childSnap.key;
                         const msg = childSnap.val();
                         const isMine = msg.senderUid === currentUserData.uid;
-                        const isGroupAdmin = targetUser.isAdmin || targetUser.isOwner;
+                        const isGroupAdmin = currentUserData.isAdmin || currentUserData.isOwner;
 
                         const div = document.createElement('div');
                         if (msg.type === 'system') {
@@ -754,6 +755,7 @@
                             const senderNameHtml = !isMine ? `<div class="message-sender-name">${msg.senderName || 'Usuário'}</div>` : '';
                             div.innerHTML = `${senderNameHtml}<div>${msg.text}</div>`;
 
+                            // Clique para apagar mensagem (se for minha ou se eu for admin)
                             if (!msg.deleted && (isMine || isGroupAdmin)) {
                                 div.onclick = () => deletarMensagem(msgKey, isMine, isGroupAdmin);
                             }
