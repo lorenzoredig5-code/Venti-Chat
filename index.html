@@ -254,6 +254,20 @@
             padding: 0;
             margin-top: 6px;
         }
+
+        /* Estilo da Barra Fixa de Anúncio */
+        .ad-banner-container {
+            width: 100%;
+            background-color: #f1f3f4;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            padding: 4px 0;
+            min-height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -277,6 +291,20 @@
         <!-- TELA PRINCIPAL (HISTÓRICO DE CONVERSAS) -->
         <div class="content" id="main-chat-list">
             <p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Carregando...</p>
+        </div>
+
+        <!-- BARRA FIXA DE ANÚNCIO (MONETIZAÇÃO) -->
+        <div class="ad-banner-container">
+            <script type="text/javascript">
+              atOptions = {
+                'key' : 'd927768606ac03740922d3c319e15bef',
+                'format' : 'iframe',
+                'height' : 50,
+                'width' : 320,
+                'params' : {}
+              };
+            </script>
+            <script type="text/javascript" src="https://bicea.org/22/d927768606ac03740922d3c319e15bef"></script>
         </div>
 
         <!-- TELA DE CHAT PRIVADO -->
@@ -457,7 +485,6 @@
         document.getElementById('btn-close-config').onclick = () => configModal.classList.add('hidden');
         document.getElementById('btn-close-chat').onclick = () => fecharChat();
 
-        // Entrar ou Criar Conta
         document.getElementById('btn-submit-auth').onclick = async () => {
             const username = document.getElementById('auth-username').value.trim().toLowerCase();
             const password = document.getElementById('auth-password').value;
@@ -503,7 +530,6 @@
             }
         };
 
-        // Lógica de Esqueci Minha Senha / Redefinição via E-mail
         document.getElementById('btn-send-recovery').onclick = async () => {
             const searchVal = document.getElementById('recovery-input').value.trim().toLowerCase();
             const resultDiv = document.getElementById('recovery-result');
@@ -534,7 +560,6 @@
                     return;
                 }
 
-                // Envia e-mail oficial de redefinição de senha do Firebase
                 await sendPasswordResetEmail(auth, foundUser.email);
                 resultDiv.innerText = `✅ Conta encontrada: "${foundUser.displayName || foundUser.username}"!\nEnviamos um e-mail de redefinição de senha para ${foundUser.email}. Verifique sua caixa de entrada/spam.`;
             } catch (error) {
@@ -935,7 +960,6 @@
             }
         }
 
-        // Salvar Configurações (Nome, ID, E-mail e Bio)
         document.getElementById('btn-save-config').onclick = async () => {
             if (!auth.currentUser) return;
             const uid = auth.currentUser.uid;
@@ -967,7 +991,6 @@
                 }
             }
 
-            // Atualiza o e-mail no Firebase Authentication se for informado
             if (newEmail && newEmail !== currentUserData.email) {
                 try {
                     await updateEmail(auth.currentUser, newEmail);
@@ -976,7 +999,6 @@
                 }
             }
 
-            // Garante a foto de perfil da API do DiceBear vinculada ao nome real do usuário
             const photoURL = `https://api.dicebear.com/10.x/lorelei/svg?seed=${newRealName}`;
 
             const updatedData = {
