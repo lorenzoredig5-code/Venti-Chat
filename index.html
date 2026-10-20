@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vinte Chat</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --surface-color: #ffffff;
+            --text-primary: #202124;
+            --text-secondary: #5f6368;
+            --border-color: #dadce0;
+            --button-bg: #ffffff;
+            --button-hover: #f1f3f4;
+            --shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+            --primary-blue: #1a73e8;
+            --badge-red: #d93025;
+            --msg-my-bg: #e8f0fe;
+            --msg-other-bg: #f1f3f4;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            height: 90vh;
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .btn {
+            background-color: var(--button-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .btn:hover {
+            background-color: var(--button-hover);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+        }
+
+        .btn-danger {
+            background-color: #d93025;
+            color: white;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background-color: #c5221f;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--badge-red);
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .chat-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f3f4;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #bdc1c6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 12px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            flex: 1;
+            text-align: center;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 8px 0;
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+
+        .message-mine {
+            align-self: flex-end;
+            background-color: var(--msg-my-bg);
+            color: var(--text-primary);
+            border: 1px solid #d2e3fc;
+        }
+
+        .message-other {
+            align-self: flex-start;
+            background-color: var(--msg-other-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+            margin-top: 8px;
+        }
+
+        .chat-input-area input {
+            flex: 1;
+            margin: 0;
+        }
+
+        input[type="text"], input[type="password"], input[type="email"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0 16px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        textarea {
+            resize: none;
+            height: 60px;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--text-secondary);
+            margin: 12px 0 6px 0;
+        }
+
+        .link-btn {
+            background: none;
+            border: none;
+            color: var(--primary-blue);
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.85rem;
+            padding: 0;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- HEADER PRINCIPAL -->
+        <header>
+            <h1 id="app-title">Vinte Chat</h1>
+            <div>
+                <button class="btn" id="btn-notifications" title="Notificações">
+                    🔔
+                    <span id="notif-badge" class="notification-badge hidden">0</span>
+                </button>
+                <button class="btn" id="btn-add" title="Adicionar Amigos">➕</button>
+                <button class="btn" id="btn-config" title="Configurações">⚙️</button>
+                <button class="btn hidden" id="btn-login-screen">Entrar</button>
+                <button class="btn hidden" id="btn-logout">Sair</button>
+            </div>
+        </header>
+
+        <!-- TELA PRINCIPAL (HISTÓRICO DE CONVERSAS) -->
+        <div class="content" id="main-chat-list">
+            <p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Carregando...</p>
+        </div>
+
+        <!-- TELA DE CHAT PRIVADO -->
+        <div id="chat-room-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-chat">Voltar</button>
+                <h2 id="chat-target-name">Conversa</h2>
+            </div>
+            <div class="messages-container" id="messages-list"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-message-input" placeholder="Digite uma mensagem...">
+                <button class="btn btn-primary" id="btn-send-message">Enviar</button>
+            </div>
+        </div>
+
+        <!-- TELA DE LOGIN / CRIAR CONTA UNIFICADA -->
+        <div id="auth-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-auth">Voltar</button>
+                <h2>Entrar ou Criar Conta</h2>
+            </div>
+            <label>Nome Real (ID de Usuário único):</label>
+            <input type="text" id="auth-username" placeholder="Ex: joao123">
+            <label>Senha:</label>
+            <input type="password" id="auth-password" placeholder="******">
+            <button class="btn btn-primary" id="btn-submit-auth" style="margin-bottom: 8px;">Entrar / Criar Conta</button>
+            <button class="link-btn" id="btn-forgot-password">Esqueci minha senha</button>
+        </div>
+
+        <!-- TELA DE RECUPERAÇÃO DE SENHA -->
+        <div id="recovery-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-recovery">Voltar</button>
+                <h2>Recuperar Senha</h2>
+            </div>
+            <label>Digite seu Nome Real ou E-mail da conta:</label>
+            <input type="text" id="recovery-input" placeholder="Ex: joao123 ou joao@gmail.com">
+            <button class="btn btn-primary" id="btn-send-recovery">Buscar Conta e Enviar E-mail</button>
+            <div id="recovery-result" style="margin-top: 15px; text-align: center; font-size: 0.9rem;"></div>
+        </div>
+
+        <!-- TELA DE ADICIONAR PESSOAS / BUSCA E SUGESTÕES -->
+        <div id="add-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-add">Voltar</button>
+                <h2>Adicionar Amigos</h2>
+            </div>
+            <input type="text" class="search-bar" id="search-user-input" placeholder="Pesquisar usuário...">
+            <div class="content" id="search-results-list" style="padding: 0;"></div>
+            
+            <div class="section-title">Sugestões de Amizade</div>
+            <div class="content" id="suggestions-list" style="padding: 0; max-height: 180px;"></div>
+        </div>
+
+        <!-- TELA DE PERFIL DO USUÁRIO -->
+        <div id="profile-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-profile">Voltar</button>
+                <h2 id="profile-title-name">Perfil</h2>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; margin-top: 20px;">
+                <div class="avatar" id="profile-avatar" style="width: 80px; height: 80px; font-size: 1.5rem; margin-bottom: 12px;">U</div>
+                <h3 id="profile-display-name" style="margin: 0 0 2px 0;">Nome de Exibição</h3>
+                <p id="profile-real-name" style="margin: 0 0 6px 0; font-size: 0.8rem; color: var(--text-secondary);">@nome_real</p>
+                <p id="profile-bio" style="margin: 0 0 10px 0; font-size: 0.85rem; text-align: center; color: var(--text-primary); font-style: italic;"></p>
+                <p id="profile-friend-status" style="margin: 0 0 20px 0; font-size: 0.85rem; color: var(--primary-blue); font-weight: bold;"></p>
+                
+                <div id="profile-actions" style="display: flex; flex-direction: column; width: 100%; gap: 10px;"></div>
+            </div>
+        </div>
+
+        <!-- TELA DE NOTIFICAÇÕES -->
+        <div id="notifications-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-notif">Voltar</button>
+                <h2>Notificações</h2>
+            </div>
+            <div class="content" id="notifications-list" style="padding: 0;">
+                <p style="color: var(--text-secondary);">Nenhuma notificação nova.</p>
+            </div>
+        </div>
+
+        <!-- TELA DE CONFIGURAÇÕES -->
+        <div id="config-modal" class="modal hidden">
+            <div class="modal-header">
+                <button class="btn" id="btn-close-config">Voltar</button>
+                <h2>Configurações</h2>
+            </div>
+            <label>Nome de Exibição (Apelido):</label>
+            <input type="text" id="config-display-name" placeholder="Seu nome bonito...">
+
+            <label>Nome Real (ID único):</label>
+            <input type="text" id="config-real-name" placeholder="Seu nome real exclusivo...">
+
+            <label>E-mail da Conta (para recuperação de senha):</label>
+            <input type="email" id="config-email" placeholder="seuemail@gmail.com">
+
+            <label>Biografia / Recado:</label>
+            <textarea id="config-bio" placeholder="Escreva algo sobre você..."></textarea>
+
+            <label style="display: flex; align-items: center; margin-top: 10px; cursor: pointer;">
+                <input type="checkbox" id="allow-direct-message" style="width: auto; margin-right: 8px;">
+                 Permitir mensagem direta de quem não é amigo
+            </label>
+
+            <button class="btn btn-primary" id="btn-save-config" style="margin-top: 20px;">Salvar Configurações</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, updateEmail, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getDatabase, ref, set, get, update, child, remove, push, onValue, off } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyCxFcZGxHBILooE1U_UsySdzPU_lCyt2Bw",
+          authDomain: "sitefjrebase.firebaseapp.com",
+          databaseURL: "https://sitefjrebase-default-rtdb.firebaseio.com",
+          projectId: "sitefjrebase",
+          storageBucket: "sitefjrebase.firebasestorage.app",
+          messagingSenderId: "667261334607",
+          appId: "1:667261334607:web:dec574c7521bb0f885a63a",
+          measurementId: "G-RYP4VY86JS"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        setPersistence(auth, browserLocalPersistence).catch((error) => {
+            console.error("Erro na persistência:", error);
+        });
+
+        let currentUserData = null;
+        let activeChatUser = null;
+        let activeChatListener = null;
+
+        const authModal = document.getElementById('auth-modal');
+        const recoveryModal = document.getElementById('recovery-modal');
+        const addModal = document.getElementById('add-modal');
+        const profileModal = document.getElementById('profile-modal');
+        const notifModal = document.getElementById('notifications-modal');
+        const configModal = document.getElementById('config-modal');
+        const chatRoomModal = document.getElementById('chat-room-modal');
+
+        document.getElementById('btn-login-screen').onclick = () => authModal.classList.remove('hidden');
+        document.getElementById('btn-close-auth').onclick = () => authModal.classList.add('hidden');
+
+        document.getElementById('btn-forgot-password').onclick = () => {
+            authModal.classList.add('hidden');
+            recoveryModal.classList.remove('hidden');
+            document.getElementById('recovery-result').innerHTML = "";
+        };
+        document.getElementById('btn-close-recovery').onclick = () => {
+            recoveryModal.classList.add('hidden');
+            authModal.classList.remove('hidden');
+        };
+
+        document.getElementById('btn-add').onclick = () => { addModal.classList.remove('hidden'); carregarUsuarios(""); carregarSugestoes(); }
+        document.getElementById('btn-close-add').onclick = () => addModal.classList.add('hidden');
+
+        document.getElementById('btn-close-profile').onclick = () => profileModal.classList.add('hidden');
+
+        document.getElementById('btn-notifications').onclick = () => { notifModal.classList.remove('hidden'); carregarNotificacoes(); }
+        document.getElementById('btn-close-notif').onclick = () => notifModal.classList.add('hidden');
+
+        document.getElementById('btn-config').onclick = () => {
+            if (currentUserData) {
+                document.getElementById('config-display-name').value = currentUserData.displayName || currentUserData.username || "";
+                document.getElementById('config-real-name').value = currentUserData.username || "";
+                document.getElementById('config-email').value = currentUserData.email || "";
+                document.getElementById('config-bio').value = currentUserData.bio || "";
+                document.getElementById('allow-direct-message').checked = currentUserData.allowDirectMessage || false;
+            }
+            configModal.classList.remove('hidden');
+        };
+        document.getElementById('btn-close-config').onclick = () => configModal.classList.add('hidden');
+        document.getElementById('btn-close-chat').onclick = () => fecharChat();
+
+        // Entrar ou Criar Conta
+        document.getElementById('btn-submit-auth').onclick = async () => {
+            const username = document.getElementById('auth-username').value.trim().toLowerCase();
+            const password = document.getElementById('auth-password').value;
+            if (!username || !password) { alert("Preencha os campos!"); return; }
+
+            const fakeEmail = `${username}@vintechat.local`;
+
+            try {
+                await signInWithEmailAndPassword(auth, fakeEmail, password);
+                authModal.classList.add('hidden');
+            } catch (loginError) {
+                try {
+                    const usersSnap = await get(ref(db, 'users'));
+                    let nameExists = false;
+                    if (usersSnap.exists()) {
+                        usersSnap.forEach(childSnap => {
+                            if (childSnap.val().username === username) nameExists = true;
+                        });
+                    }
+
+                    if (nameExists) {
+                        alert("Erro: Este nome real já está em uso ou a senha está incorreta.");
+                        return;
+                    }
+
+                    const cred = await createUserWithEmailAndPassword(auth, fakeEmail, password);
+                    const generatedPhotoUrl = `https://api.dicebear.com/10.x/lorelei/svg?seed=${username}`;
+
+                    await set(ref(db, 'users/' + cred.user.uid), {
+                        uid: cred.user.uid,
+                        username: username,
+                        displayName: username,
+                        email: "",
+                        bio: "",
+                        allowDirectMessage: false,
+                        photoURL: generatedPhotoUrl
+                    });
+                    alert("Conta criada e logada com sucesso!");
+                    authModal.classList.add('hidden');
+                } catch (regError) {
+                    alert("Erro ao entrar ou criar conta: " + regError.message);
+                }
+            }
+        };
+
+        // Lógica de Esqueci Minha Senha / Redefinição via E-mail
+        document.getElementById('btn-send-recovery').onclick = async () => {
+            const searchVal = document.getElementById('recovery-input').value.trim().toLowerCase();
+            const resultDiv = document.getElementById('recovery-result');
+            if (!searchVal) { alert("Digite o nome de usuário ou o e-mail!"); return; }
+
+            resultDiv.innerText = "Buscando conta...";
+
+            try {
+                const usersSnap = await get(ref(db, 'users'));
+                let foundUser = null;
+
+                if (usersSnap.exists()) {
+                    usersSnap.forEach(childSnap => {
+                        const u = childSnap.val();
+                        if (u.username === searchVal || (u.email && u.email.toLowerCase() === searchVal)) {
+                            foundUser = u;
+                        }
+                    });
+                }
+
+                if (!foundUser) {
+                    resultDiv.innerText = "❌ Nenhuma conta foi encontrada com esse nome ou e-mail.";
+                    return;
+                }
+
+                if (!foundUser.email) {
+                    resultDiv.innerText = `⚠️ Conta encontrada (${foundUser.displayName || foundUser.username}), mas ela não possui um e-mail cadastrado para redefinir a senha.`;
+                    return;
+                }
+
+                // Envia e-mail oficial de redefinição de senha do Firebase
+                await sendPasswordResetEmail(auth, foundUser.email);
+                resultDiv.innerText = `✅ Conta encontrada: "${foundUser.displayName || foundUser.username}"!\nEnviamos um e-mail de redefinição de senha para ${foundUser.email}. Verifique sua caixa de entrada/spam.`;
+            } catch (error) {
+                resultDiv.innerText = "Erro ao enviar e-mail: " + error.message;
+            }
+        };
+
+        document.getElementById('btn-logout').onclick = () => signOut(auth);
+
+        onAuthStateChanged(auth, async (user) => {
+            const btnLoginScreen = document.getElementById('btn-login-screen');
+            const btnLogout = document.getElementById('btn-logout');
+            const mainList = document.getElementById('main-chat-list');
+
+            if (user) {
+                btnLoginScreen.classList.add('hidden');
+                btnLogout.classList.remove('hidden');
+                
+                const userRef = ref(db, `users/${user.uid}`);
+                let snap = await get(userRef);
+
+                if (snap.exists()) {
+                    currentUserData = snap.val();
+                } else {
+                    const fallbackName = user.email ? user.email.split('@')[0] : "usuario";
+                    const generatedPhotoUrl = `https://api.dicebear.com/10.x/lorelei/svg?seed=${fallbackName}`;
+                    currentUserData = {
+                        uid: user.uid,
+                        username: fallbackName,
+                        displayName: fallbackName,
+                        email: "",
+                        bio: "",
+                        allowDirectMessage: false,
+                        photoURL: generatedPhotoUrl
+                    };
+                    await set(userRef, currentUserData);
+                }
+
+                carregarConversasEAmigos();
+                observarNotificacoes();
+            } else {
+                btnLoginScreen.classList.remove('hidden');
+                btnLogout.classList.add('hidden');
+                currentUserData = null;
+                mainList.innerHTML = `<p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Faça login para ver suas conversas.</p>`;
+                document.getElementById('notif-badge').classList.add('hidden');
+            }
+        });
+
+        function getChatId(uid1, uid2) {
+            return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+        }
+
+        function abrirChat(targetUser) {
+            activeChatUser = targetUser;
+            document.getElementById('chat-target-name').innerText = targetUser.displayName || targetUser.username;
+            chatRoomModal.classList.remove('hidden');
+            profileModal.classList.add('hidden');
+
+            const chatId = getChatId(currentUserData.uid, targetUser.uid);
+            const messagesRef = ref(db, `chats/${chatId}/messages`);
+
+            activeChatListener = onValue(messagesRef, (snapshot) => {
+                const messagesList = document.getElementById('messages-list');
+                messagesList.innerHTML = "";
+
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnap) => {
+                        const msg = childSnap.val();
+                        const isMine = msg.senderUid === currentUserData.uid;
+                        
+                        const div = document.createElement('div');
+                        div.className = `message-bubble ${isMine ? 'message-mine' : 'message-other'}`;
+                        div.innerText = msg.text;
+                        messagesList.appendChild(div);
+                    });
+                    messagesList.scrollTop = messagesList.scrollHeight;
+                } else {
+                    messagesList.innerHTML = `<p style="text-align: center; color: var(--text-secondary); margin-top: 20px;">Nenhuma mensagem ainda. Digite algo abaixo!</p>`;
+                }
+            });
+        }
+
+        function fecharChat() {
+            if (activeChatListener && activeChatUser) {
+                const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
+                off(ref(db, `chats/${chatId}/messages`));
+            }
+            activeChatUser = null;
+            chatRoomModal.classList.add('hidden');
+            carregarConversasEAmigos();
+        }
+
+        document.getElementById('btn-send-message').onclick = async () => {
+            const input = document.getElementById('chat-message-input');
+            const text = input.value.trim();
+            if (!text || !activeChatUser || !currentUserData) return;
+
+            const chatId = getChatId(currentUserData.uid, activeChatUser.uid);
+            const messagesRef = ref(db, `chats/${chatId}/messages`);
+            const newMsgRef = push(messagesRef);
+
+            const msgData = {
+                senderUid: currentUserData.uid,
+                text: text,
+                timestamp: Date.now()
+            };
+
+            await set(newMsgRef, msgData);
+            await set(ref(db, `chats/${chatId}/lastMessage`), msgData);
+            input.value = "";
+        };
+
+        async function observarNotificacoes() {
+            if (!currentUserData) return;
+            const snap = await get(ref(db, `friendRequests/${currentUserData.uid}`));
+            const badge = document.getElementById('notif-badge');
+
+            if (snap.exists()) {
+                let count = 0;
+                snap.forEach((childSnap) => {
+                    if (childSnap.val().status === "pendente") count++;
+                });
+
+                if (count > 0) {
+                    badge.classList.remove('hidden');
+                    badge.innerText = count > 5 ? "várias" : count;
+                } else {
+                    badge.classList.add('hidden');
+                }
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        async function carregarConversasEAmigos() {
+            if (!currentUserData) return;
+            const mainList = document.getElementById('main-chat-list');
+            mainList.innerHTML = "Carregando...";
+
+            const friendsSnap = await get(ref(db, `friends/${currentUserData.uid}`));
+            mainList.innerHTML = "";
+
+            if (friendsSnap.exists()) {
+                const friendUids = Object.keys(friendsSnap.val());
+                
+                for (const friendUid of friendUids) {
+                    const userSnap = await get(child(ref(db), `users/${friendUid}`));
+                    if (userSnap.exists()) {
+                        const friend = userSnap.val();
+                        const chatId = getChatId(currentUserData.uid, friend.uid);
+                        
+                        const lastMsgSnap = await get(ref(db, `chats/${chatId}/lastMessage`));
+                        let lastText = "Começar conversa com seu amigo";
+                        
+                        if (lastMsgSnap.exists()) {
+                            lastText = lastMsgSnap.val().text;
+                        }
+
+                        const friendName = friend.displayName || friend.username;
+                        const avatarUrl = (friend.photoURL && friend.photoURL.startsWith("http")) ? friend.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${friend.username}`;
+                        const avatarContent = `<img src="${avatarUrl}" alt="${friendName}">`;
+
+                        const div = document.createElement('div');
+                        div.className = "chat-item";
+                        div.innerHTML = `
+                            <div style="display: flex; align-items: center; flex: 1;">
+                                <div class="avatar">${avatarContent}</div>
+                                <div class="chat-info">
+                                    <h4>${friendName}</h4>
+                                    <p>${lastText}</p>
+                                </div>
+                            </div>
+                        `;
+                        div.onclick = () => abrirChat(friend);
+                        mainList.appendChild(div);
+                    }
+                }
+            } else {
+                mainList.innerHTML = `<p style="color: var(--text-secondary); text-align: center; margin-top: 40px;">Nenhum amigo adicionado ainda. Clique em ➕ para encontrar pessoas.</p>`;
+            }
+        }
+
+        const searchInput = document.getElementById('search-user-input');
+        const searchResultsList = document.getElementById('search-results-list');
+        const suggestionsList = document.getElementById('suggestions-list');
+
+        async function carregarUsuarios(filtro) {
+            if (!currentUserData) return;
+            searchResultsList.innerHTML = "Carregando...";
+            const usersSnap = await get(ref(db, 'users'));
+            searchResultsList.innerHTML = "";
+
+            if (usersSnap.exists()) {
+                usersSnap.forEach((childSnap) => {
+                    const u = childSnap.val();
+                    if (u.uid === currentUserData.uid) return;
+                    
+                    const displayName = u.displayName || u.username;
+                    if (filtro && !displayName.toLowerCase().includes(filtro.toLowerCase()) && !u.username.toLowerCase().includes(filtro.toLowerCase())) return;
+
+                    const avatarUrl = (u.photoURL && u.photoURL.startsWith("http")) ? u.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${u.username}`;
+                    const avatarContent = `<img src="${avatarUrl}" alt="${displayName}">`;
+
+                    const div = document.createElement('div');
+                    div.className = "chat-item";
+                    div.innerHTML = `
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <div class="avatar">${avatarContent}</div>
+                            <div class="chat-info"><h4>${displayName}</h4></div>
+                        </div>
+                        <button class="btn">Ver Perfil</button>
+                    `;
+                    div.onclick = () => abrirPerfil(u);
+                    searchResultsList.appendChild(div);
+                });
+            } else {
+                searchResultsList.innerHTML = "<p style='padding: 10px;'>Nenhum usuário encontrado.</p>";
+            }
+        }
+
+        searchInput.oninput = (e) => carregarUsuarios(e.target.value);
+
+        async function carregarSugestoes() {
+            if (!currentUserData) return;
+            suggestionsList.innerHTML = "Carregando...";
+            const usersSnap = await get(ref(db, 'users'));
+            const friendsSnap = await get(ref(db, `friends/${currentUserData.uid}`));
+            
+            const friendsList = friendsSnap.exists() ? Object.keys(friendsSnap.val()) : [];
+            suggestionsList.innerHTML = "";
+
+            let count = 0;
+            if (usersSnap.exists()) {
+                usersSnap.forEach((childSnap) => {
+                    const u = childSnap.val();
+                    if (u.uid === currentUserData.uid) return;
+                    if (friendsList.includes(u.uid)) return;
+                    if (count >= 10) return;
+
+                    count++;
+                    const displayName = u.displayName || u.username;
+                    const avatarUrl = (u.photoURL && u.photoURL.startsWith("http")) ? u.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${u.username}`;
+                    const avatarContent = `<img src="${avatarUrl}" alt="${displayName}">`;
+
+                    const div = document.createElement('div');
+                    div.className = "chat-item";
+                    div.innerHTML = `
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <div class="avatar">${avatarContent}</div>
+                            <div class="chat-info"><h4>${displayName}</h4></div>
+                        </div>
+                        <button class="btn">Ver Perfil</button>
+                    `;
+                    div.onclick = () => abrirPerfil(u);
+                    suggestionsList.appendChild(div);
+                });
+            }
+            if (count === 0) {
+                suggestionsList.innerHTML = "<p style='padding: 10px; color: var(--text-secondary);'>Nenhuma sugestão no momento.</p>";
+            }
+        }
+
+        async function abrirPerfil(targetUser) {
+            const freshSnap = await get(child(ref(db), `users/${targetUser.uid}`));
+            const userData = freshSnap.exists() ? freshSnap.val() : targetUser;
+
+            const displayName = userData.displayName || userData.username;
+            const realName = `@${userData.username}`;
+            const bioText = userData.bio || "Sem biografia.";
+
+            document.getElementById('profile-title-name').innerText = displayName;
+            document.getElementById('profile-display-name').innerText = displayName;
+            document.getElementById('profile-real-name').innerText = realName;
+            document.getElementById('profile-bio').innerText = bioText;
+            
+            const avatarDiv = document.getElementById('profile-avatar');
+            const avatarUrl = (userData.photoURL && userData.photoURL.startsWith("http")) ? userData.photoURL : `https://api.dicebear.com/10.x/lorelei/svg?seed=${userData.username}`;
+            avatarDiv.innerHTML = `<img src="${avatarUrl}" alt="${displayName}">`;
+
+            const statusText = document.getElementById('profile-friend-status');
+            const actionsDiv = document.getElementById('profile-actions');
+            statusText.innerText = "";
+            actionsDiv.innerHTML = "";
+            profileModal.classList.remove('hidden');
+
+            const friendsSnap = await get(child(ref(db), `friends/${currentUserData.uid}/${targetUser.uid}`));
+            const isFriend = friendsSnap.exists();
+
+            const reqSnap = await get(child(ref(db), `friendRequests/${targetUser.uid}/${currentUserData.uid}`));
+            const sentSnap = reqSnap.exists();
+
+            if (isFriend) {
+                statusText.innerText = "Você tem amizade com essa pessoa";
+                
+                const btnRemove = document.createElement('button');
+                btnRemove.className = "btn btn-danger";
+                btnRemove.innerText = "Remover Amizade";
+                btnRemove.addEventListener('click', async () => {
+                    if (confirm(`Deseja realmente remover ${displayName} dos seus amigos?`)) {
+                        await remove(ref(db, `friends/${currentUserData.uid}/${targetUser.uid}`));
+                        await remove(ref(db, `friends/${targetUser.uid}/${currentUserData.uid}`));
+                        alert("Amizade removida com sucesso.");
+                        abrirPerfil(userData);
+                        carregarConversasEAmigos();
+                    }
+                });
+                actionsDiv.appendChild(btnRemove);
+
+                const btnMsg = document.createElement('button');
+                btnMsg.className = "btn";
+                btnMsg.innerText = "Mandar Mensagem";
+                btnMsg.addEventListener('click', () => abrirChat(userData));
+                actionsDiv.appendChild(btnMsg);
+            } else {
+                if (sentSnap) {
+                    const btnCancel = document.createElement('button');
+                    btnCancel.className = "btn";
+                    btnCancel.innerText = "Cancelar Pedido de Amizade";
+                    btnCancel.addEventListener('click', async () => {
+                        await remove(ref(db, `friendRequests/${targetUser.uid}/${currentUserData.uid}`));
+                        alert("Pedido cancelado.");
+                        abrirPerfil(userData);
+                    });
+                    actionsDiv.appendChild(btnCancel);
+                } else {
+                    const btnAdd = document.createElement('button');
+                    btnAdd.className = "btn btn-primary";
+                    btnAdd.innerText = "Adicionar como Amigo";
+                    btnAdd.addEventListener('click', async () => {
+                        await set(ref(db, `friendRequests/${targetUser.uid}/${currentUserData.uid}`), {
+                            fromUid: currentUserData.uid,
+                            fromUsername: currentUserData.displayName || currentUserData.username,
+                            status: "pendente"
+                        });
+                        alert(`Pedido enviado para ${displayName}!`);
+                        abrirPerfil(userData);
+                    });
+                    actionsDiv.appendChild(btnAdd);
+                }
+
+                if (userData.allowDirectMessage) {
+                    const btnMsg = document.createElement('button');
+                    btnMsg.className = "btn";
+                    btnMsg.innerText = "Mandar Mensagem";
+                    btnMsg.addEventListener('click', () => abrirChat(userData));
+                    actionsDiv.appendChild(btnMsg);
+                }
+            }
+        }
+
+        async function carregarNotificacoes() {
+            if (!currentUserData) return;
+            const notifList = document.getElementById('notifications-list');
+            notifList.innerHTML = "Carregando...";
+            const snap = await get(ref(db, `friendRequests/${currentUserData.uid}`));
+            notifList.innerHTML = "";
+
+            if (snap.exists()) {
+                let temPendentes = false;
+                snap.forEach((childSnap) => {
+                    const req = childSnap.val();
+                    if (req.status === "pendente") {
+                        temPendentes = true;
+                        const div = document.createElement('div');
+                        div.className = "chat-item";
+                        div.innerHTML = `
+                            <div class="chat-info"><h4>${req.fromUsername}</h4><p>Te enviou um pedido</p></div>
+                            <div>
+                                <button class="btn btn-primary" id="accept-${req.fromUid}">Aceitar</button>
+                                <button class="btn" id="reject-${req.fromUid}">Recusar</button>
+                            </div>
+                        `;
+                        notifList.appendChild(div);
+
+                        div.querySelector(`#accept-${req.fromUid}`).addEventListener('click', async () => {
+                            await set(ref(db, `friends/${currentUserData.uid}/${req.fromUid}`), true);
+                            await set(ref(db, `friends/${req.fromUid}/${currentUserData.uid}`), true);
+                            await remove(ref(db, `friendRequests/${currentUserData.uid}/${req.fromUid}`));
+                            alert(`${req.fromUsername} adicionado como amigo!`);
+                            carregarNotificacoes();
+                            carregarConversasEAmigos();
+                            observarNotificacoes();
+                        });
+
+                        div.querySelector(`#reject-${req.fromUid}`).addEventListener('click', async () => {
+                            await remove(ref(db, `friendRequests/${currentUserData.uid}/${req.fromUid}`));
+                            carregarNotificacoes();
+                            observarNotificacoes();
+                        });
+                    }
+                });
+                if (!temPendentes) {
+                    notifList.innerHTML = "<p style='padding: 10px; color: var(--text-secondary);'>Nenhuma notificação.</p>";
+                }
+            } else {
+                notifList.innerHTML = "<p style='padding: 10px; color: var(--text-secondary);'>Nenhuma notificação.</p>";
+            }
+        }
+
+        // Salvar Configurações (Nome, ID, E-mail e Bio)
+        document.getElementById('btn-save-config').onclick = async () => {
+            if (!auth.currentUser) return;
+            const uid = auth.currentUser.uid;
+            
+            const newDisplayName = document.getElementById('config-display-name').value.trim();
+            const newRealName = document.getElementById('config-real-name').value.trim().toLowerCase();
+            const newEmail = document.getElementById('config-email').value.trim();
+            const newBio = document.getElementById('config-bio').value.trim();
+            const allowDM = document.getElementById('allow-direct-message').checked;
+
+            if (!newRealName) {
+                alert("O nome real não pode ficar vazio!");
+                return;
+            }
+
+            if (newRealName !== currentUserData.username) {
+                const usersSnap = await get(ref(db, 'users'));
+                let exists = false;
+                if (usersSnap.exists()) {
+                    usersSnap.forEach(childSnap => {
+                        if (childSnap.key !== uid && childSnap.val().username === newRealName) {
+                            exists = true;
+                        }
+                    });
+                }
+                if (exists) {
+                    alert("Erro: Este nome real (ID único) já está sendo usado por outro usuário.");
+                    return;
+                }
+            }
+
+            // Atualiza o e-mail no Firebase Authentication se for informado
+            if (newEmail && newEmail !== currentUserData.email) {
+                try {
+                    await updateEmail(auth.currentUser, newEmail);
+                } catch (emailErr) {
+                    console.log("Aviso ao atualizar e-mail no Auth:", emailErr.message);
+                }
+            }
+
+            // Garante a foto de perfil da API do DiceBear vinculada ao nome real do usuário
+            const photoURL = `https://api.dicebear.com/10.x/lorelei/svg?seed=${newRealName}`;
+
+            const updatedData = {
+                username: newRealName,
+                displayName: newDisplayName || newRealName,
+                email: newEmail,
+                bio: newBio,
+                allowDirectMessage: allowDM,
+                photoURL: photoURL
+            };
+
+            await update(ref(db, `users/${uid}`), updatedData);
+            currentUserData = { ...currentUserData, ...updatedData };
+
+            alert("Configurações salvas com sucesso!");
+            configModal.classList.add('hidden');
+            carregarConversasEAmigos();
+        };
+    </script>
+</body>
+</html>
